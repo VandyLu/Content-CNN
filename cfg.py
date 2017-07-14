@@ -12,6 +12,7 @@ class Param():
         self.window_size = 9
         self.dispmax = 228
         self.kernel = 3
+        self.img2batch = 32
 
         self.dataset = {'TRAIN':'./data/train.tfrecords',
                         'TEST':'./data/val.tfrecords'}

@@ -17,7 +17,8 @@ import cfg
 import db
 import stereo_input
 
-
+batch_norm = tf.contrib.layers.batch_norm
+convolution2d = tf.contrib.layers.convolution2d
 
 def getWindow(img0,img1,disp,center,size):
     ''' img0: H*W*3
@@ -128,25 +129,33 @@ def test_roiLayer():
 
 initializer = tf.contrib.layers.xavier_initializer_conv2d(uniform=False)
 
-def conv2d(x, kernel_shape, strides=[1,1,1,1], relu=True, padding='SAME'):
-    W = tf.get_variable("weights", kernel_shape, initializer=initializer)
-    tf.add_to_collection(tf.GraphKeys.WEIGHTS, W)
-    b = tf.get_variable("biases", kernel_shape[3], initializer=tf.constant_initializer(0.0))
-    with tf.name_scope("conv"):
-        # attention !!!
-        # disparity from 0-227  strides[3] must be 1
-        x = tf.nn.conv2d(x, W, strides=strides, padding=padding)
-        x = tf.nn.bias_add(x, b)
-        if kernel_shape[2] == 3:
-            x_min = tf.reduce_min(W)
-            x_max = tf.reduce_max(W)
-            kernel_0_to_1 = (W - x_min) / (x_max - x_min)
-            kernel_transposed = tf.transpose(kernel_0_to_1, [3, 0, 1, 2])
-            tf.summary.image('filters', kernel_transposed, max_outputs=3)
-        if relu:
-            x = tf.nn.relu(x)
-            #x = tf.maximum(LEAKY_ALPHA * x, x)
-    return x
+def conv2d(x, kernel_shape, strides=[1,1,1,1], relu=True,padding='SAME',reuse=False,scope=None):
+    kernel = kernel_shape[0]
+    input_nums = kernel_shape[2]
+    output_nums = kernel_shape[3]
+    return convolution2d(x,output_nums,kernel,normalizer_fn=batch_norm,activation_fn=tf.nn.relu,padding=padding,
+            weights_initializer=initializer,biases_initializer=initializer,reuse=reuse,scope=scope)
+    
+
+#def conv2d(x, kernel_shape, strides=[1,1,1,1], relu=True, padding='SAME'):
+#    W = tf.get_variable("weights", kernel_shape, initializer=initializer)
+#    tf.add_to_collection(tf.GraphKeys.WEIGHTS, W)
+#    b = tf.get_variable("biases", kernel_shape[3], initializer=tf.constant_initializer(0.0))
+#    with tf.name_scope("conv"):
+#        # attention !!!
+#        # disparity from 0-227  strides[3] must be 1
+#        x = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+#        x = tf.nn.bias_add(x, b)
+#        if kernel_shape[2] == 3:
+#            x_min = tf.reduce_min(W)
+#            x_max = tf.reduce_max(W)
+#            kernel_0_to_1 = (W - x_min) / (x_max - x_min)
+#            kernel_transposed = tf.transpose(kernel_0_to_1, [3, 0, 1, 2])
+#            tf.summary.image('filters', kernel_transposed, max_outputs=3)
+#        if relu:
+#            x = tf.nn.relu(x)
+#            #x = tf.maximum(LEAKY_ALPHA * x, x)
+#    return x
 
 def resblock(x0,kernel_shape):
     W1 = tf.get_variable("weights1",kernel_shape,initializer=initializer)
@@ -261,6 +270,7 @@ class Luo():
         self.lr = cfg.param.learning_rate
         self.beta1 = cfg.param.beta1
         self.beta2 = cfg.param.beta2
+        self.img2batch = cfg.param.img2batch
 
         self.build_model()
     def build_model(self,scope='Luo'):
@@ -270,7 +280,7 @@ class Luo():
         t0 = time.time()
         if self.mode=='TRAIN':
             train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
-            train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],512)
+            train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],self.img2batch)
             test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
             self.inputs = train_batch
         elif self.mode=='VAL':
@@ -311,7 +321,7 @@ class Luo():
                 scope.reuse_variables()
                 conv5b = conv2d(conv4b,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
             # (n,1,228,64)
-        elif cfg.param.kernel == 3:
+        elif cfg.param.kernel == 0:
             # (n,9,9,3)
             # (n,9,9+227,3)
             with tf.variable_scope('conv1') as scope:
@@ -334,6 +344,25 @@ class Luo():
                 scope.reuse_variables()
                 conv5b = conv2d(conv3b,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
             # (n,1,1+227,64)
+        elif cfg.param.kernel ==3:
+            with tf.variable_scope('conv1') as scope:
+                conv1a = conv2d(img0_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv1b = conv2d(img1_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+            # (n,7,7+227,64)
+            with tf.variable_scope('conv2') as scope:
+                conv2a = conv2d(conv1a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv2b = conv2d(conv1b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+            # (n,5,5+227,64)
+            with tf.variable_scope('conv3') as scope:
+                conv3a = conv2d(conv2a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv3b = conv2d(conv2b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+            # (n,3,3+227,64)
+            with tf.variable_scope('conv4') as scope:
+                conv5a = conv2d(conv3a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv5b = conv2d(conv3b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+            # (n,1,1+227,64)
+
+
 
         va = tf.reshape(conv5a,[-1,64,1])
         vb = tf.reshape(conv5b,[-1,228,64])
