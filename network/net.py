@@ -370,7 +370,7 @@ class Luo():
         print 'va:',va
         print 'vb:',vb
         self.gt = tf.cast(disp_batch,tf.int32) #disp==0 vb[227]
-        self.all_probs = tf.nn.softmax(tf.reshape(tf.matmul(vb,va),(-1,228)))
+        self.all_probs = tf.clip_by_value(tf.nn.softmax(tf.reshape(tf.matmul(vb,va),(-1,228))),1e-12,1.0)
         batch_size = tf.shape(disp_batch)[0]
         all_p = tf.reshape(self.all_probs,[-1])
         gather_index1 = self.dispmax*tf.range(batch_size)+self.gt
@@ -391,6 +391,7 @@ class Luo():
         
         self.predictions = tf.cast(tf.argmax(self.all_probs,1),tf.int32)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions,self.gt),tf.float32))
+#lr = tf.train.exponential_decay(self.lr,global_step=self.global_step,decay_steps=100,decay_rate=0.95)
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr,
                                             beta1=self.beta1,
                                             beta2=self.beta2)

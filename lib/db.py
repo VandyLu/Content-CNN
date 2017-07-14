@@ -14,7 +14,7 @@ sys.path.append('./lib')
 sys.path.append('./lib/io_disp')
 import cfg
 import preprocess as pre
-from io_disp_tools import *
+#from io_disp_tools import *
 
 
 class Pair():

@@ -12,13 +12,13 @@ class Param():
         self.window_size = 9
         self.dispmax = 228
         self.kernel = 3
-        self.img2batch = 32
+        self.img2batch = 128
 
         self.dataset = {'TRAIN':'./data/train.tfrecords',
                         'TEST':'./data/val.tfrecords'}
-        self.train_iter = 1000
-        self.test_iter = 200 # test every 200 iter
-        self.learning_rate = 0.00005
+        self.train_iter = 100000
+        self.test_iter = 400 # test every 200 iter
+        self.learning_rate = 0.00001
         self.beta1 = 0.9
         self.beta2 = 0.99
 
