@@ -12,6 +12,8 @@ sys.path.append('./lib')
 import cfg
 import db
 
+
+
 class StereoInput():
 
     def __init__(self,dbfile,batch_size=4):

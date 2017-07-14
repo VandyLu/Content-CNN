@@ -20,6 +20,12 @@ import stereo_input
 batch_norm = tf.contrib.layers.batch_norm
 convolution2d = tf.contrib.layers.convolution2d
 
+def pre(img):
+    img = tf.cast(img,tf.float32)
+    mean = tf.reduce_mean(img)
+    std = tf.sqrt(tf.reduce_mean(tf.square(img-mean)))
+    return (img-mean)/std
+
 def variable_summaries(var,name):
     with tf.name_scope('summaries'):
         tf.summary.histogram(name,var)
@@ -290,6 +296,7 @@ class Luo():
         with tf.name_scope('data_roi'):
             if self.mode=='TRAIN':
                 train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
+
                 train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],self.img2batch)
                 test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
                 self.inputs = train_batch
@@ -302,6 +309,11 @@ class Luo():
         print 'input:{}s'.format(t1-t0)
 
         img0_batch,img1_batch,disp_batch = self.inputs
+        tf.summary.image('input_x0',img0_batch,10)
+        tf.summary.image('input_x1',img1_batch,10)
+        tf.summary.histogram('input_disp',disp_batch)
+        img0_batch = pre(img0_batch)
+        img1_batch = pre(img1_batch)
 
         if cfg.param.kernel == 5:
             # (n,21,21,3)

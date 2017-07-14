@@ -51,15 +51,15 @@ class DB():
                 }
             )
         shape = cfg.param.crop_shape
-        img0 = tf.decode_raw(features['img1'],tf.float32)
+        img0 = tf.decode_raw(features['img1'],tf.uint8)
         img0 = tf.reshape(img0,(shape[0],shape[1],3))
-        img1 = tf.decode_raw(features['img1'],tf.float32)
+        img1 = tf.decode_raw(features['img1'],tf.uint8)
         img1 = tf.reshape(img1,(shape[0],shape[1],3))
         disp = tf.decode_raw(features['disp'],tf.float32)
         disp = tf.reshape(disp,(shape[0],shape[1]))
 
-        self.read_img0 = tf.cast(img0,tf.float32)
-        self.read_img1 = tf.cast(img1,tf.float32)
+        self.read_img0 = img0
+        self.read_img1 = img1
         self.read_disp = tf.cast(disp,tf.float32) 
         return (self.read_img0,self.read_img1,self.read_disp) # tensors
 
