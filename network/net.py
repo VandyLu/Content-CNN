@@ -32,9 +32,9 @@ def getWindow(img0,img1,disp,center,size):
     disp_batch = []
     for c in cs:
         slice_start = tf.cast(c - size/2,tf.int32)
-        img0_batch.append(tf.slice(img0,[slice_start[0],slice_start[1],0],(size,size,3)))
+        img0_batch.append(tf.slice(img0,[slice_start[0],slice_start[1],0],(size,size,-1)))
         slice_start = tf.cast(c - [size/2,size/2+dispmax-1],tf.int32)
-        img1_batch.append(tf.slice(img1,[slice_start[0],slice_start[1],0],(size,size+dispmax-1,3)))
+        img1_batch.append(tf.slice(img1,[slice_start[0],slice_start[1],0],(size,size+dispmax-1,-1)))
         disp_batch.append(disp[c[0],c[1]])
     return img0_batch,img1_batch,disp_batch
 
@@ -186,10 +186,9 @@ def shift(x,dispmax):
     #H = tf.shape(x)[1]
     #C = tf.shape(x)[3]
     H = cfg.param.window_size
-    C = 64
     imglist = tf.unstack(x)
     xlist = []
-    size = [H,H,C]
+    size = [H,H,-1]
     for img in imglist:
         for i in range(dispmax,0,-1):
             xlist.append(tf.slice(img,[0,i-1,0],size))
@@ -270,8 +269,8 @@ class Luo():
         
         t0 = time.time()
         if self.mode=='TRAIN':
-            train_batch,test_batch = traintest_pipeline(batch_size=4) # 4*32=128
-            train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],32)
+            train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
+            train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],512)
             test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
             self.inputs = train_batch
         elif self.mode=='VAL':
@@ -284,72 +283,85 @@ class Luo():
 
         img0_batch,img1_batch,disp_batch = self.inputs
 
-        self.batch_size = tf.shape(disp_batch)[0]
-        with tf.variable_scope('conv1') as scope:
-            conv1a = conv2d(img0_batch,[7,7,3,64])
-            scope.reuse_variables()
-            conv1b = conv2d(img1_batch,[7,7,3,64])
-        # (n,63,63+227,64)
-        # shared weight
-        with tf.variable_scope('resblock1') as scope:
-            res1a = resblock(conv1a,[3,3,64,64])
-            scope.reuse_variables()
-            res1b = resblock(conv1b,[3,3,64,64])
-        with tf.variable_scope('resblock2') as scope:
-            res2a = resblock(res1a,[3,3,64,64])
-            scope.reuse_variables()
-            res2b = resblock(res1b,[3,3,64,64])
-        with tf.variable_scope('resblock3') as scope:
-            res3a = resblock(res2a,[3,3,64,64])
-            scope.reuse_variables()
-            res3b = resblock(res2b,[3,3,64,64])
-        with tf.variable_scope('resblock4') as scope:
-            res4a = resblock(res3a,[3,3,64,64])
-            scope.reuse_variables()
-            res4b = resblock(res3b,[3,3,64,64])
-        with tf.variable_scope('resblock5') as scope:
-            res5a = resblock(res4a,[3,3,64,64])
-            scope.reuse_variables()
-            res5b = resblock(res4b,[3,3,64,64])
-        # (n,63,63+227,64)
-        t2 = time.time()
-        print 'resnet:{}s'.format(t2-t0)
-        with tf.variable_scope('shift1'):
-            shift1b = shift(res5b,self.dispmax)
-        t2 = time.time()
-        print 'resnet:{}s'.format(t2-t0)
-        print 'res5a:',res5a
-        print 'res5b:',res5b
-        print 'shift1b:',shift1b
-        # (n*228,63,63,64)
-        # do not share weight
-        with tf.variable_scope('conv2a') as scope:
-            conv2a = conv2d(res5a,[5,5,64,16],strides=[1,2,2,1])
-        with tf.variable_scope('conv2b') as scope:
-            conv2b = conv2d(shift1b,[5,5,64,16],strides=[1,2,2,1])
-        with tf.variable_scope('conv3a') as scope:
-            conv3a = conv2d(conv2a,[5,5,16,1],strides=[1,2,2,1])
-        with tf.variable_scope('conv3b') as scope:
-            conv3b = conv2d(conv2b,[5,5,16,1],strides=[1,2,2,1])
-        print 'conv3a:',conv3a
-        print 'conv3b:',conv3b
-        # (n,16,16,1)
-        # (n*228,16,16,1)
-        flattened1a = tf.reshape(conv3a,[-1,256])
-        flattened1b = tf.reshape(conv3b,[-1,256])
+        if cfg.param.kernel == 5:
+            # (n,21,21,3)
+            # (n,21,21+227,3)
+            with tf.variable_scope('conv1') as scope:
+                conv1a = conv2d(img0_batch,[5,5,3,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv1b = conv2d(img1_batch,[5,5,3,64],strides=[1,1,1,1],padding='VALID')
+            # (n,17,17+227,64)
+            with tf.variable_scope('conv2') as scope:
+                conv2a = conv2d(conv1a,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv2b = conv2d(conv1b,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,13,13+227,64)
+            with tf.variable_scope('conv3') as scope:
+                conv3a = conv2d(conv2a,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv3b = conv2d(conv2b,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,9,9+227,64)
+            with tf.variable_scope('conv4') as scope:
+                conv4a = conv2d(conv3a,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv4b = conv2d(conv3b,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,5,5+227,64)
+            with tf.variable_scope('conv5') as scope:
+                conv5a = conv2d(conv4a,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv5b = conv2d(conv4b,[5,5,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,1,228,64)
+        elif cfg.param.kernel == 3:
+            # (n,9,9,3)
+            # (n,9,9+227,3)
+            with tf.variable_scope('conv1') as scope:
+                conv1a = conv2d(img0_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv1b = conv2d(img1_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID')
+            # (n,7,7+227,64)
+            with tf.variable_scope('conv2') as scope:
+                conv2a = conv2d(conv1a,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv2b = conv2d(conv1b,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,5,5+227,64)
+            with tf.variable_scope('conv3') as scope:
+                conv3a = conv2d(conv2a,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv3b = conv2d(conv2b,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,3,3+227,64)
+            with tf.variable_scope('conv4') as scope:
+                conv5a = conv2d(conv3a,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+                scope.reuse_variables()
+                conv5b = conv2d(conv3b,[3,3,64,64],strides=[1,1,1,1],padding='VALID')
+            # (n,1,1+227,64)
+
+        va = tf.reshape(conv5a,[-1,64,1])
+        vb = tf.reshape(conv5b,[-1,228,64])
+        vb = tf.reverse(vb,[1]) # to make the image disp==0 located at the [0]
+        print 'va:',va
+        print 'vb:',vb
+        self.gt = tf.cast(disp_batch,tf.int32) #disp==0 vb[227]
+        self.all_probs = tf.nn.softmax(tf.reshape(tf.matmul(vb,va),(-1,228)))
+        batch_size = tf.shape(disp_batch)[0]
+        all_p = tf.reshape(self.all_probs,[-1])
+        gather_index1 = self.dispmax*tf.range(batch_size)+self.gt
+        gather_index2 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+1,self.dispmax-1)
+        gather_index3 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+2,self.dispmax-1)
+        gather_index2_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-1,0)
+        gather_index3_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-2,0)
+
+        self.probs = tf.gather(all_p,gather_index1)
+        self.probs2 = tf.gather(all_p,gather_index2)
+        self.probs2_ = tf.gather(all_p,gather_index2_)
+        self.probs3 = tf.gather(all_p,gather_index3)
+        self.probs3_ = tf.gather(all_p,gather_index3_)
+
+        self.losses = -(0.5*tf.log(self.probs)+0.2*tf.log(self.probs2)+0.2*tf.log(self.probs2_)+
+                0.05*tf.log(self.probs3) + 0.05*tf.log(self.probs3_))
+        self.loss = tf.reduce_mean(self.losses)
         
-        gt = tf.cast(disp_batch,tf.int32)
-        print 'flat1a:',flattened1a
-        print 'flat1b:',flattened1b
-        print 'disp_batch',disp_batch
-        self.loss,self.all_probs,self.argmins = shift_loss(flattened1a,
-                                flattened1b,
-                                gt,
-                                self.dispmax,
-                                self.p)
-        t3 = time.time()
-        print 'shiftloss:{}s'.format(t3-t0)
-        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.argmins,gt),tf.float32))
+        self.predictions = tf.cast(tf.argmax(self.all_probs,1),tf.int32)
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions,self.gt),tf.float32))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr,
                                             beta1=self.beta1,
                                             beta2=self.beta2)

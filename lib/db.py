@@ -27,8 +27,8 @@ class Pair():
             self.img1 = pre.processRight(self.img1)
             self.disp = pre.processDisp(self.disp)
         
-        self.size = disp.shape
-        assert self.size==img0.shape[0:2] and self.size==img1.shape[0:2],'Error shape size'
+        self.size = self.disp.shape
+        print self.size
 
     def tobytes(self):
         return (self.img0.tobytes(),self.img1.tobytes(),self.disp.tobytes())
@@ -51,9 +51,9 @@ class DB():
                 }
             )
         shape = cfg.param.crop_shape
-        img0 = tf.decode_raw(features['img0'],tf.uint8)
+        img0 = tf.decode_raw(features['img1'],tf.float32)
         img0 = tf.reshape(img0,(shape[0],shape[1],3))
-        img1 = tf.decode_raw(features['img1'],tf.uint8)
+        img1 = tf.decode_raw(features['img1'],tf.float32)
         img1 = tf.reshape(img1,(shape[0],shape[1],3))
         disp = tf.decode_raw(features['disp'],tf.float32)
         disp = tf.reshape(disp,(shape[0],shape[1]))

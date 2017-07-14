@@ -9,14 +9,15 @@ class Param():
         self.n_te = 100
 
         self.crop_shape = (360,1200)
-        self.window_size = 63
+        self.window_size = 9
         self.dispmax = 228
+        self.kernel = 3
 
         self.dataset = {'TRAIN':'./data/train.tfrecords',
                         'TEST':'./data/val.tfrecords'}
         self.train_iter = 1000
         self.test_iter = 200 # test every 200 iter
-        self.learning_rate = 0.0001
+        self.learning_rate = 0.00005
         self.beta1 = 0.9
         self.beta2 = 0.99
 
