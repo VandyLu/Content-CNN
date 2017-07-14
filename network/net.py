@@ -20,6 +20,14 @@ import stereo_input
 batch_norm = tf.contrib.layers.batch_norm
 convolution2d = tf.contrib.layers.convolution2d
 
+def variable_summaries(var,name):
+    with tf.name_scope('summaries'):
+        tf.summary.histogram(name,var)
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean/'+name,mean)
+        stddev = tf.sqrt(tf.reduce_mean(tf.square(var-mean)))
+        tf.summary.scalar('stddev/'+name,stddev)
+
 def getWindow(img0,img1,disp,center,size):
     ''' img0: H*W*3
         disp: H*W
@@ -258,6 +266,7 @@ def val_pipeline():
     test_batch = si.test_batch()
     return test_batch
 
+
 class Luo():
     def __init__(self,mode,ckpt_path=None):
         '''
@@ -278,16 +287,17 @@ class Luo():
         self.p = tf.constant([0.5,0.2,0.05,0.0])
         
         t0 = time.time()
-        if self.mode=='TRAIN':
-            train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
-            train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],self.img2batch)
-            test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
-            self.inputs = train_batch
-        elif self.mode=='VAL':
-            self.x0 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size,3])
-            self.x1 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size+self.dispmax-1,3])
-            self.y = tf.placeholder(tf.float32,[None])
-            self.inputs = (self.x0,self.x1,self.y)
+        with tf.name_scope('data_roi'):
+            if self.mode=='TRAIN':
+                train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
+                train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],self.img2batch)
+                test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
+                self.inputs = train_batch
+            elif self.mode=='VAL':
+                self.x0 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size,3])
+                self.x1 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size+self.dispmax-1,3])
+                self.y = tf.placeholder(tf.float32,[None])
+                self.inputs = (self.x0,self.x1,self.y)
         t1 = time.time()
         print 'input:{}s'.format(t1-t0)
 
@@ -362,40 +372,49 @@ class Luo():
                 conv5b = conv2d(conv3b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
             # (n,1,1+227,64)
 
-
-
-        va = tf.reshape(conv5a,[-1,64,1])
-        vb = tf.reshape(conv5b,[-1,228,64])
-        vb = tf.reverse(vb,[1]) # to make the image disp==0 located at the [0]
+        with tf.name_scope('reshapes'):
+            va = tf.reshape(conv5a,[-1,64,1])
+            vb = tf.reshape(conv5b,[-1,228,64])
+            vb = tf.reverse(vb,[1]) # to make the image disp==0 located at the [0]
         print 'va:',va
         print 'vb:',vb
-        self.gt = tf.cast(disp_batch,tf.int32) #disp==0 vb[227]
-        self.all_probs = tf.clip_by_value(tf.nn.softmax(tf.reshape(tf.matmul(vb,va),(-1,228))),1e-12,1.0)
+
+        with tf.name_scope('dot'):
+            self.all_probs = tf.clip_by_value(tf.nn.softmax(tf.reshape(tf.matmul(vb,va),(-1,228))),1e-12,1.0)
+            tf.summary.histogram('disparity_probs',self.all_probs)
+
         batch_size = tf.shape(disp_batch)[0]
-        all_p = tf.reshape(self.all_probs,[-1])
-        gather_index1 = self.dispmax*tf.range(batch_size)+self.gt
-        gather_index2 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+1,self.dispmax-1)
-        gather_index3 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+2,self.dispmax-1)
-        gather_index2_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-1,0)
-        gather_index3_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-2,0)
+        with tf.name_scope('gather'):
+            self.gt = tf.cast(disp_batch,tf.int32) #disp==0 vb[227]
+            all_p = tf.reshape(self.all_probs,[-1])
+            gather_index1 = self.dispmax*tf.range(batch_size)+self.gt
+            gather_index2 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+1,self.dispmax-1)
+            gather_index3 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+2,self.dispmax-1)
+            gather_index2_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-1,0)
+            gather_index3_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-2,0)
 
-        self.probs = tf.gather(all_p,gather_index1)
-        self.probs2 = tf.gather(all_p,gather_index2)
-        self.probs2_ = tf.gather(all_p,gather_index2_)
-        self.probs3 = tf.gather(all_p,gather_index3)
-        self.probs3_ = tf.gather(all_p,gather_index3_)
+            self.probs = tf.gather(all_p,gather_index1)
+            self.probs2 = tf.gather(all_p,gather_index2)
+            self.probs2_ = tf.gather(all_p,gather_index2_)
+            self.probs3 = tf.gather(all_p,gather_index3)
+            self.probs3_ = tf.gather(all_p,gather_index3_)
 
-        self.losses = -(0.5*tf.log(self.probs)+0.2*tf.log(self.probs2)+0.2*tf.log(self.probs2_)+
+        with tf.name_scope('loss'):
+            self.losses = -(0.5*tf.log(self.probs)+0.2*tf.log(self.probs2)+0.2*tf.log(self.probs2_)+
                 0.05*tf.log(self.probs3) + 0.05*tf.log(self.probs3_))
-        self.loss = tf.reduce_mean(self.losses)
+            self.loss = tf.reduce_mean(self.losses)
+            tf.summary.scalar('cross-entropy',self.loss)
         
-        self.predictions = tf.cast(tf.argmax(self.all_probs,1),tf.int32)
-        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions,self.gt),tf.float32))
+        with tf.name_scope('accuracy'):
+            self.predictions = tf.cast(tf.argmax(self.all_probs,1),tf.int32)
+            self.accuracy = tf.reduce_mean(tf.cast(tf.less(tf.abs(self.predictions-self.gt),3),tf.float32))
+            tf.summary.scalar('acc',self.accuracy)
 #lr = tf.train.exponential_decay(self.lr,global_step=self.global_step,decay_steps=100,decay_rate=0.95)
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr,
                                             beta1=self.beta1,
                                             beta2=self.beta2)
         self.train_op = self.optimizer.minimize(self.loss,global_step=self.global_step)
+        self.merged = tf.summary.merge_all()
 
 
 if __name__ == '__main__':
