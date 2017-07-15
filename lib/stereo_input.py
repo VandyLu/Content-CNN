@@ -18,8 +18,10 @@ class StereoInput():
 
     def __init__(self,dbfile,batch_size=4):
         self.db_train = db.DB(mode='r')
+
         img0,img1,disp = self.db_train.read(dbfile['TRAIN'])
-        self.img0,self.img1,self.disp = tf.train.shuffle_batch(    
+
+        self.img0, self.img1, self.disp = tf.train.shuffle_batch(    
             [img0,img1,disp],
             batch_size=batch_size,
             capacity=100,
@@ -60,6 +62,7 @@ if __name__=='__main__':
         coord.join(threads)
 
     print img0[0]
+    print np.sum(np.abs(img0[0]-img1[0]))
     cv2.imshow('img0',img0[0].astype(np.uint8))
     cv2.imshow('img1',img1[0].astype(np.uint8))
     cv2.waitKey()

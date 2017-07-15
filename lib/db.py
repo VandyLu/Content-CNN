@@ -51,7 +51,7 @@ class DB():
                 }
             )
         shape = cfg.param.crop_shape
-        img0 = tf.decode_raw(features['img1'],tf.uint8)
+        img0 = tf.decode_raw(features['img0'],tf.uint8)
         img0 = tf.reshape(img0,(shape[0],shape[1],3))
         img1 = tf.decode_raw(features['img1'],tf.uint8)
         img1 = tf.reshape(img1,(shape[0],shape[1],3))

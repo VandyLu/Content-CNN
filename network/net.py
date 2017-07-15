@@ -22,7 +22,7 @@ convolution2d = tf.contrib.layers.convolution2d
 
 def pre(img):
     img = tf.cast(img,tf.float32)
-    mean = tf.reduce_mean(img)
+    mean = tf.reduce_mean(img,[1,2,3])*tf.ones(tf.shape(img))
     std = tf.sqrt(tf.reduce_mean(tf.square(img-mean)))
     return (img-mean)/std
 
@@ -102,8 +102,8 @@ def roiLayer(img0,img1,disp,n):
    
 def test_roiLayer():
     data_path = {
-        'train':'./data/train.tfrecords',
-        'test':'./data/val.tfrecords'} 
+        'TRAIN':'./data/train.tfrecords',
+        'TEST':'./data/val.tfrecords'} 
 
     si = stereo_input.StereoInput(data_path,batch_size=4)
     img0_tr,img1_tr,disp_tr = si.train_batch()
@@ -116,19 +116,27 @@ def test_roiLayer():
         threads = tf.train.start_queue_runners(sess=sess,coord=coord)
         # warm up
         i0,i1,d = sess.run([img0_tr,img1_tr,disp_tr])
+        print 'total image error',np.sum(np.abs(i0[0]-i1[0]))
         cv2.imshow('i0',i0[0].astype(np.uint8))
         cv2.imshow('i1',i1[0].astype(np.uint8))
         cv2.imshow('d',d[0].astype(np.uint8))
         cv2.waitKey()
+
         for i in range(3):
             i0,i1,d = sess.run([img0,img1,disp])
+            
             print 'img0 shape:',i0.shape
             print 'img1 shape:',i1.shape
             print 'disp shape:',d.shape
+            
 
             cv2.imshow('i0',i0[0].astype(np.uint8))
             cv2.imshow('i1',i1[0].astype(np.uint8))
             print d
+            i0 = i0[0]
+            i1 = i1[0,-9:,-9:,:]
+            d = d[0]
+            print np.sum(np.abs(i0-i1))
             cv2.waitKey()
 
         t1 = time.time()
@@ -142,13 +150,15 @@ def test_roiLayer():
 
 
 initializer = tf.contrib.layers.xavier_initializer_conv2d(uniform=False)
-
+LEAKY_VALUE=0.001
 def conv2d(x, kernel_shape, strides=[1,1,1,1], relu=True,padding='SAME',reuse=False,scope=None):
     kernel = kernel_shape[0]
     input_nums = kernel_shape[2]
     output_nums = kernel_shape[3]
-    return convolution2d(x,output_nums,kernel,normalizer_fn=batch_norm,activation_fn=tf.nn.relu,padding=padding,
+    
+    out =  convolution2d(x,output_nums,kernel,normalizer_fn=batch_norm,activation_fn=None,padding=padding,
             weights_initializer=initializer,biases_initializer=initializer,reuse=reuse,scope=scope)
+    return tf.maximum(out,LEAKY_VALUE*out)
     
 
 #def conv2d(x, kernel_shape, strides=[1,1,1,1], relu=True, padding='SAME'):
@@ -296,10 +306,13 @@ class Luo():
         with tf.name_scope('data_roi'):
             if self.mode=='TRAIN':
                 train_batch,test_batch = traintest_pipeline(batch_size=2) # 4*32=128
+                self.mode = tf.placeholder_with_default(input=True,shape=(),name='train_or_test')
 
                 train_batch = roiLayer(train_batch[0],train_batch[1],train_batch[2],self.img2batch)
-                test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],32)
-                self.inputs = train_batch
+                test_batch = roiLayer(test_batch[0],test_batch[1],test_batch[2],self.img2batch)
+                
+                self.inputs = tf.cond(self.mode,lambda: train_batch,lambda: test_batch)
+                self._test_img0,self._test_img1,self._test_disp = self.inputs
             elif self.mode=='VAL':
                 self.x0 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size,3])
                 self.x1 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size+self.dispmax-1,3])
@@ -312,8 +325,11 @@ class Luo():
         tf.summary.image('input_x0',img0_batch,10)
         tf.summary.image('input_x1',img1_batch,10)
         tf.summary.histogram('input_disp',disp_batch)
-        img0_batch = pre(img0_batch)
-        img1_batch = pre(img1_batch)
+
+        img0_batch = tf.cast(img0_batch,tf.float32)
+        img1_batch = tf.cast(img1_batch,tf.float32)
+        #img0_batch = pre(img0_batch)
+        #img1_batch = pre(img1_batch)
 
         if cfg.param.kernel == 5:
             # (n,21,21,3)
@@ -368,16 +384,16 @@ class Luo():
             # (n,1,1+227,64)
         elif cfg.param.kernel ==3:
             with tf.variable_scope('conv1') as scope:
-                conv1a = conv2d(img0_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID',scope=scope)
-                conv1b = conv2d(img1_batch,[3,3,3,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+                conv1a = conv2d(img0_batch,[3,3,3,128],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv1b = conv2d(img1_batch,[3,3,3,128],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
             # (n,7,7+227,64)
             with tf.variable_scope('conv2') as scope:
-                conv2a = conv2d(conv1a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
-                conv2b = conv2d(conv1b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+                conv2a = conv2d(conv1a,[3,3,128,128],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv2b = conv2d(conv1b,[3,3,128,128],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
             # (n,5,5+227,64)
             with tf.variable_scope('conv3') as scope:
-                conv3a = conv2d(conv2a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
-                conv3b = conv2d(conv2b,[3,3,64,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
+                conv3a = conv2d(conv2a,[3,3,128,64],strides=[1,1,1,1],padding='VALID',scope=scope)
+                conv3b = conv2d(conv2b,[3,3,128,64],strides=[1,1,1,1],padding='VALID',reuse=True,scope=scope)
             # (n,3,3+227,64)
             with tf.variable_scope('conv4') as scope:
                 conv5a = conv2d(conv3a,[3,3,64,64],strides=[1,1,1,1],padding='VALID',scope=scope)
@@ -400,10 +416,10 @@ class Luo():
             self.gt = tf.cast(disp_batch,tf.int32) #disp==0 vb[227]
             all_p = tf.reshape(self.all_probs,[-1])
             gather_index1 = self.dispmax*tf.range(batch_size)+self.gt
-            gather_index2 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+1,self.dispmax-1)
-            gather_index3 = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt+2,self.dispmax-1)
-            gather_index2_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-1,0)
-            gather_index3_ = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt-2,0)
+            gather_index2 = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt+1,self.dispmax-1)
+            gather_index3 = self.dispmax*tf.range(batch_size)+tf.minimum(self.gt+2,self.dispmax-1)
+            gather_index2_ = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt-1,0)
+            gather_index3_ = self.dispmax*tf.range(batch_size)+tf.maximum(self.gt-2,0)
 
             self.probs = tf.gather(all_p,gather_index1)
             self.probs2 = tf.gather(all_p,gather_index2)
@@ -430,18 +446,26 @@ class Luo():
 
 
 if __name__ == '__main__':
-    
-    net = Luo(mode='TRAIN')
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess,coord=coord)
-        
-        _,loss,accuracy = sess.run([net.train_op,net.loss,net.accuracy])
-        print loss
-        print accuracy
 
-        coord.request_stop()
-        coord.join(threads)
-
-
+    test_roiLayer()
+#    net = Luo(mode='TRAIN')
+#    with tf.Session() as sess:
+#        sess.run(tf.global_variables_initializer())
+#        coord = tf.train.Coordinator()
+#        threads = tf.train.start_queue_runners(sess=sess,coord=coord)
+#        
+#        for i in range(100):
+#            img0,img1,disp = sess.run([net._test_img0,net._test_img1,net._test_disp])
+#            n=2
+#            img0 = img0[n,:,:,0]
+#            img1 = img1[n,-9:,-9:,0]
+#            disp = disp[n]
+#            print np.sum(np.abs(img0-img1))
+#        #_,loss,accuracy = sess.run([net.train_op,net.loss,net.accuracy])
+#        #print loss
+#        #print accuracy
+#
+#        coord.request_stop()
+#        coord.join(threads)
+#
+#

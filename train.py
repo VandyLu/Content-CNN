@@ -30,29 +30,32 @@ with tf.Session() as sess:
         global_step = sess.run(net.global_step)
 
     for i in range(cfg.param.train_iter):
-        runs = [    net.merged,
+
+        runs = [net.merged,
                     net.train_op,
                     net.global_step,
                     net.loss,
-                    net.accuracy ]
-
-        if global_step%cfg.param.test_iter==0:
-            #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-            #run_metadata = tf.RunMetadata()
-            merged_summary,_,global_step,loss,acc = sess.run(runs)
-            #        options=run_options,run_metadata=run_metadata)
-
-            #summary_writer.add_run_metadata(run_metadata,'step{}'.format(global_step))
-            summary_writer.add_summary(merged_summary,global_step=global_step)
-        else:
-            merged_summary,_,global_step,loss,acc = sess.run(runs)
-            summary_writer.add_summary(merged_summary,global_step=global_step)
-        print 'step:{},loss:{},acc:{}'.format(global_step,loss,acc)
+                    net.accuracy,
+                    net.predictions,
+                    net.gt ]
+        merged_summary,_,global_step,loss,acc,p,gt = sess.run(runs)
+        summary_writer.add_summary(merged_summary,global_step=global_step)
+        print 'step:%d\tloss:%.2f\tacc:%.4f\terr:%.1f'%(global_step,loss,acc,np.mean(np.abs(gt-p)))
 
         if global_step%cfg.param.save_iter == 0:
             save_path = cfg.param.model_save_path.format('Luo',global_step)
             saver.save(sess,save_path)
             print 'model saved to:{}!'.format(save_path)
+
+        if global_step%cfg.param.test_iter==0:
+            test_runs = [net.loss,
+                    net.accuracy,
+                    net.predictions,
+                    net.gt ]
+            loss,acc,p,gt = sess.run(test_runs,feed_dict={net.mode:False})
+            print 'testing:'
+            print 'step:%d\tloss:%.2f\tacc:%.4f\terr:%.1f'%(global_step,loss,acc,np.mean(np.abs(gt-p)))
+
 
     coord.request_stop()
     coord.join(threads)
