@@ -286,7 +286,7 @@ def val_pipeline():
 class Luo():
     def __init__(self,mode,ckpt_path=None):
         '''
-            mode: 'TRAIN' 'TEST'
+            mode: 'TRAIN' 'VAL'
         '''
         self.mode = mode
         self.crop_shape = cfg.param.crop_shape
@@ -314,8 +314,8 @@ class Luo():
                 self.inputs = tf.cond(self.mode,lambda: train_batch,lambda: test_batch)
                 self._test_img0,self._test_img1,self._test_disp = self.inputs
             elif self.mode=='VAL':
-                self.x0 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size,3])
-                self.x1 = tf.placeholder(tf.float32,[None,self.window_size,self.window_size+self.dispmax-1,3])
+                self.x0 = tf.placeholder(tf.uint8,[None,self.window_size,self.window_size,3])
+                self.x1 = tf.placeholder(tf.uint8,[None,self.window_size,self.window_size+self.dispmax-1,3])
                 self.y = tf.placeholder(tf.float32,[None])
                 self.inputs = (self.x0,self.x1,self.y)
         t1 = time.time()

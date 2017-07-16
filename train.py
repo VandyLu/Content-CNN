@@ -55,6 +55,7 @@ with tf.Session() as sess:
             loss,acc,p,gt = sess.run(test_runs,feed_dict={net.mode:False})
             print 'testing:'
             print 'step:%d\tloss:%.2f\tacc:%.4f\terr:%.1f'%(global_step,loss,acc,np.mean(np.abs(gt-p)))
+            print np.abs(p-gt)
 
 
     coord.request_stop()

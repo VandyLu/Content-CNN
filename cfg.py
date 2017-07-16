@@ -20,7 +20,7 @@ class Param():
         self.train_iter = 500000
         self.test_iter = 100 # test every 200 iter
         self.save_iter = 200
-        self.learning_rate = 0.0004
+        self.learning_rate = 0.0005
         self.beta1 = 0.9
         self.beta2 = 0.99
 
