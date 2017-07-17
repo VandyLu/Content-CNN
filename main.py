@@ -16,6 +16,9 @@ from StereoInput import val_pipeline
 import io_disp_tools
 import argparse
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ['CUDA_VISIBLE_DEVICES']='1'
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--mode", dest="mode", default="train", type=str, help='mode:train or val')
 parser.add_argument("-c", "--ckpt", dest="checkpoint_path", default="", type=str,metavar="FILE", help='model checkpoint path')
