@@ -12,7 +12,7 @@ sys.path.append('./')
 import cfg
 
 def processLeft(img):
-    crop = cfg.param.crop_shape
+    crop = cfg.crop_shape
     img = img[0:crop[0],0:crop[1]]
     img = (img-np.mean(img))/np.std(img)
     return img.astype(np.float32)
@@ -23,7 +23,7 @@ def processRight(img):
 def processDisp(img):
     ''' disp \in [0,70]
     '''
-    crop = cfg.param.crop_shape
+    crop = cfg.crop_shape
     img = img[0:crop[0],0:crop[1]]
     return img.astype(np.float32)
     

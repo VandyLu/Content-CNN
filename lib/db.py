@@ -16,7 +16,6 @@ import cfg
 import preprocess as pre
 #from io_disp_tools import *
 
-
 class Pair():
     def __init__(self,img0,img1,disp,preprocess = True):
         self.img0 = img0.astype(np.uint8)
@@ -50,7 +49,7 @@ class DB():
                 'disp': tf.FixedLenFeature([],tf.string),
                 }
             )
-        shape = cfg.param.crop_shape
+        shape = cfg.crop_shape
         img0 = tf.decode_raw(features['img0'],tf.uint8)
         img0 = tf.reshape(img0,(shape[0],shape[1],3))
         img1 = tf.decode_raw(features['img1'],tf.uint8)
@@ -132,8 +131,8 @@ class DB():
         self.img_set = [os.path.splitext(s)[0] for s in os.listdir(self.disp_left_dir)]
         
         # cfg
-        self.n_tr = cfg.param.n_tr
-        self.n_te = cfg.param.n_te
+        self.n_tr = cfg.n_tr
+        self.n_te = cfg.n_te
         if self.n_tr+self.n_te > 200:
             print 'Warning: n_tr+n_te >200'
         if shuffle:

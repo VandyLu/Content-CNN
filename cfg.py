@@ -1,39 +1,38 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+model_name = 'Content_CNN'
 
-class Param():
+# dataset prepare
+n_tr = 100
+n_te = 100
+crop_shape = (360,1200)
+dataset = {'TRAIN':'./data/train.tfrecords',
+                'TEST':'./data/val.tfrecords'}
 
-    def __init__(self):
-        self.n_tr = 100
-        self.n_te = 100
+# origin dataset path
+path = '/data/stereo/training/'
+disp_path = path+'disp_noc_0'
+img0_path = path+'image_2'
+img1_path = path+'image_3'
+# val set
+val_path = './data/data_scene_flow/testing/'
+val_img0 = val_path+'image_2/'
+val_img1 = val_path+'image_3/'
 
-        self.crop_shape = (360,1200)
-        self.window_size = 9
-        self.dispmax = 228
-        self.kernel = 3
-        self.img2batch = 64
+# network structure
+window_size = 9
+dispmax = 228
+kernel = 3
+batch_size = 128
+img_num = 4
 
-        self.dataset = {'TRAIN':'./data/train.tfrecords',
-                        'TEST':'./data/val.tfrecords'}
+# trainig params
+train_iter = 500000
+test_iter = 100 # test every 200 iter
+save_iter = 200
+display_iter = 20
+learning_rate = 0.0001
+beta1 = 0.9
+beta2 = 0.99
 
-        self.train_iter = 500000
-        self.test_iter = 100 # test every 200 iter
-        self.save_iter = 200
-        self.learning_rate = 0.0005
-        self.beta1 = 0.9
-        self.beta2 = 0.99
-
-        self.model_save_path = './models/{}_{}.ckpt'
-
-class Info():
-
-    def __init__(self):
-        self.path = '/data/stereo/training/'
-        self.disp_path = self.path+'disp_noc_0'
-        self.img0_path = self.path+'image2'
-        self.img1_path = self.path+'image3'
-
-
-param = Param()
-info = Info() 

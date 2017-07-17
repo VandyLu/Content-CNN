@@ -7,7 +7,7 @@ import numpy as np
 sys.path.append('./lib/io_disp')
 import dispmap
 
-def disp2array(disp,dtype=np.float32):
+def disp2array(disp,dtype=np.float):
     w = disp.width()
     h = disp.height()
     res = np.zeros((h,w),dtype)
@@ -32,6 +32,7 @@ def dispFromArray(img):
     for i in range(d.height()):
         for j in range(d.width()):
             d.setData(img[i,j],j,i)
+    return d
 
 def copy_disp(disp):
     d = make_disp(disp.width(),disp.height())
@@ -44,6 +45,7 @@ if __name__=='__main__':
     
     path = '/data/stereo/data_scene_flow/training/disp_noc_0/'
     db.readPNG(path+'000000_10.png')
+    db.writeColor('disp_test.png',-1)
     
     print 'w:{},h{}\n'.format(db.width(),db.height())
     
@@ -52,7 +54,9 @@ if __name__=='__main__':
     print 'python:',np.max(img)
     print 'c++:',db.maxDisp()
     print '\n\n'
-    
+    disp = dispFromArray(img)
+    print 'recover:',disp.maxDisp()
+
     print 'test png display:'
     plt.imshow(img)
     plt.show()
