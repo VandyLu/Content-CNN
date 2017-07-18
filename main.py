@@ -81,8 +81,6 @@ with tf.Session() as sess:
                 disp.writeColor('output/disp/{}.png'.format(i+j*n),110)
                 cv2.imwrite('output/image_2/{}.png'.format(i+j*n),img0[i])
                 cv2.imwrite('output/image_3/{}.png'.format(i+j*n),img1[i])
-    
-
 
     coord.request_stop()
     coord.join(threads)
