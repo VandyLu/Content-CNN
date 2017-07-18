@@ -47,11 +47,11 @@ with tf.Session() as sess:
 
     if args.mode == 'train':
         for _ in range(cfg.train_iter):
-            summary,_,step,loss,acc = net.train(sess)
+            summary,_,step,loss,acc,lr = net.train(sess)
             summary_writer.add_summary(summary,global_step=step)
 
             if step % cfg.display_iter == 0:
-                print 'step:%d\tloss:%.2f\tacc:%.4f'%(step,loss,acc)
+                print 'step:%d\tloss:%.2f\tacc:%.4f\tlr:%.7f'%(step,loss,acc,lr)
 
             if step % cfg.save_iter == 0:
                 if not args.save_path == "":
