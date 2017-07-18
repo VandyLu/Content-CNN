@@ -24,15 +24,17 @@ val_img1 = val_path+'image_3/'
 window_size = 9
 dispmax = 228
 kernel = 3
-batch_size = 128
+batch_size = 256
 img_num = 4
 
 # trainig params
 train_iter = 500000
 test_iter = 100 # test every 200 iter
-save_iter = 200
+save_iter = 500
 display_iter = 20
-learning_rate = 0.0001
+learning_rate = 0.0000008
+decay_steps = 8000
+decay_rate = 1.0
 beta1 = 0.9
 beta2 = 0.99
 

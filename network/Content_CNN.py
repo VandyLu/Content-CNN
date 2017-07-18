@@ -25,7 +25,6 @@ class Content_CNN():
     def __init__(self):
         self.window_size = cfg.window_size # 9
         self.dispmax = cfg.dispmax
-        self.lr = cfg.learning_rate
         self.beta1 = cfg.beta1
         self.beta2 = cfg.beta2
         self.train_batch,self.test_batch = train_test_pipeline(batch_size=cfg.batch_size)
@@ -35,6 +34,7 @@ class Content_CNN():
     def build_model(self):
         self.mode = tf.placeholder_with_default(input=True,shape=(),name='train_or_not')
         self.global_step = tf.Variable(0,trainable=False)
+	self.lr = tf.train.exponential_decay(cfg.learning_rate, self.global_step, cfg.decay_steps, cfg.decay_rate) 
         self.p = tf.constant([0.5,0.2,0.05,0.0])
 
         with tf.name_scope('inferece_inputs'): # inference branch
@@ -131,6 +131,7 @@ class Content_CNN():
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr,
                                             beta1=self.beta1,
                                             beta2=self.beta2)
+	tf.summary.scalar('lr',self.lr)
         self.train_op = self.optimizer.minimize(self.loss,global_step=self.global_step)
         self.merged = tf.summary.merge_all()
 
@@ -153,7 +154,7 @@ class Content_CNN():
         '''
             return  summary,_,step,loss,acc
         '''
-        return sess.run([self.merged,self.train_op,self.global_step,self.loss,self.accuracy])
+        return sess.run([self.merged,self.train_op,self.global_step,self.loss,self.accuracy,self.lr])
 
     def get_step(self,sess):
         return sess.run(self.global_step)
