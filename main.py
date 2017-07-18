@@ -65,29 +65,23 @@ with tf.Session() as sess:
                 print 'step:%d\tloss:%.2f\tacc:%.4f'%(step,loss,acc)
 
     if args.mode == 'val':
-        batch_size = 1
-        img0,img1 = val_pipeline(batch_size) # numpy ndarray (128,H,W,C)
+        batch_size = 36
+        n = 3
+        for j in range(12):
+            img0,img1 = val_pipeline(n) # numpy ndarray (128,H,W,C)
         
-        print img0.shape
-        print img1.shape
-        t0 = time.time()
-        predictions,D_probs = net.inference(sess,img0,img1)
-        t1 = time.time()
-        print 'time:{}s/img'.format((t1-t0)/batch_size)
-        print 'predictions:',predictions.shape
-        predictions = np.maximum(predictions,0)
-        predictions = predictions.astype(np.uint8)
-        plt.imshow(predictions[0])
-        plt.show()
-        cv2.imshow('p',predictions[0])
-        cv2.waitKey()
-        predictions = predictions.astype(np.float)
-        print predictions[0,0]
-        disp = io_disp_tools.dispFromArray(predictions[0])
-        print 'dispmax:',disp.maxDisp()
-        disp.writeColor('predict.png',-1)
-        cv2.imwrite('test_img0.png',img0[0])
-        cv2.imwrite('test_img1.png',img1[0])
+            t0 = time.time()
+            predictions,D_probs = net.inference(sess,img0,img1)
+            t1 = time.time()
+            print 'time:{}s/img'.format((t1-t0)/n)
+
+            predictions = predictions.astype(np.float)
+            for i in range(n):
+                disp = io_disp_tools.dispFromArray(predictions[i])
+                disp.writeColor('output/disp/{}.png'.format(i+j*n),110)
+                cv2.imwrite('output/image_2/{}.png'.format(i+j*n),img0[i])
+                cv2.imwrite('output/image_3/{}.png'.format(i+j*n),img1[i])
+    
 
 
     coord.request_stop()
