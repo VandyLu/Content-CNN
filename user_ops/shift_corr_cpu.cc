@@ -13,6 +13,8 @@ using namespace tensorflow;
 
 void ShiftCorrKernel(const float* a,const float *b,float *out,const int dispmax,
 		const int n_in,const int h_in,const int w_in,const int c_in);
+void ShiftCorrKernel_GPU(const float* a,const float *b,float *out,const int dispmax,
+		const int n_in,const int h_in,const int w_in,const int c_in);
 
 class ShiftCorrOp: public OpKernel{
 public:
@@ -38,9 +40,12 @@ public:
 		
 		ShiftCorrKernel(a.data(),b.data(),out.data(),dispmax_,
 				in_shape.dim_size(0),in_shape.dim_size(1),in_shape.dim_size(2),in_shape.dim_size(3));
+		//ShiftCorrKernel_GPU(a.data(),b.data(),out.data(),dispmax_,
+		//		in_shape.dim_size(0),in_shape.dim_size(1),in_shape.dim_size(2),in_shape.dim_size(3));
 	}
 private:
 	int dispmax_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("ShiftCorr").Device(DEVICE_CPU),ShiftCorrOp);
+//REGISTER_KERNEL_BUILDER(Name("ShiftCorr").Device(DEVICE_GPU),ShiftCorrOp);
