@@ -7,11 +7,13 @@ Start
 git clone https://github.com/VandyLu/MVIG_stereo.git
 cd MVIG_stereo
 
-#Demo:
+Demo:
+-------------------------
 get models from ...
 ./main.py 
 
-#Usage:
+Usage:
+-------------------------
 ./main.py<br>
 -m: mode in 'train' 'test',defualt='test'<br>
 -c: pretrained model path<br>
