@@ -4,8 +4,8 @@ This project reimplements the Content-CNN by W.Luo. The models are trained on Ki
 
 Start
 -------------------------
-git clone https://github.com/VandyLu/MVIG_stereo.git
-cd MVIG_stereo
+git clone https://github.com/VandyLu/Content-CNN.git
+cd Content-CNN
 
 Demo:
 -------------------------
